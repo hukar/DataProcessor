@@ -94,9 +94,9 @@ public class FileProcessor
         File.Copy(inProgressFilePath, completedFilePath);
 
         // Deleting processing directory
-        string? inProgressDirectoryPath = Path.GetDirectoryName(inProgressFilePath);
+        // string? inProgressDirectoryPath = Path.GetDirectoryName(inProgressFilePath);
 
-        Directory.Delete(inProgressDirectoryPath!, recursive:true);
+        // Directory.Delete(inProgressDirectoryPath!, recursive:true);
     }
 
     private void ProcessTextFile(string inProgressFilePath)

@@ -5,9 +5,9 @@ WriteLine("Parsing command line options");
 
 string directoryToWatch = args[0];
 
-ConcurrentDictionary<string, string> Files = new();
+MemoryCache Files = MemoryCache.Default;
 
-using Timer timer = new(ProcessSingleFile,null, 0, 1000);
+ProcessExistingFiles(directoryToWatch);
 
 if (Directory.Exists(directoryToWatch) == false)
 {
@@ -40,15 +40,13 @@ ReadLine();
 void FileCreated(object sender, FileSystemEventArgs e)
 {
     WriteLine($"* File created: {e.Name} - type: {e.ChangeType}");
-    Files.TryAdd(e.FullPath, e.FullPath);
-    // ProcessSingleFile();
+    AddToCache(e.FullPath);
 }
 
 void FileChanged(object sender, FileSystemEventArgs e)
 {
     WriteLine($"* File changed: {e.Name} - type: {e.ChangeType}");
-    Files.TryAdd(e.FullPath, e.FullPath);
-    // ProcessSingleFile();
+    AddToCache(e.FullPath);
 }
 
 void FileDeleted(object sender, FileSystemEventArgs e)
@@ -66,15 +64,41 @@ void WatcherError(object sender, ErrorEventArgs e)
     WriteLine($"ERROR: file system watching may no longer be active: {e.GetException()}");
 }
 
-void ProcessSingleFile(object? state)
+void AddToCache(string fullPath)
 {
-    foreach (var file in Files.Values)
+    var item = new CacheItem(fullPath, fullPath);
+
+    var policy = new CacheItemPolicy {
+        RemovedCallback = ProcessFile,
+        SlidingExpiration = TimeSpan.FromSeconds(2)
+    };
+
+    Files.Add(item, policy);
+}
+
+void ProcessFile(CacheEntryRemovedArguments args)
+{
+    WriteLine($"* Cache Item removed: {args.CacheItem.Key} because {args.RemovedReason}");
+
+    if(args.RemovedReason == CacheEntryRemovedReason.Expired)
     {
-        if (Files.TryRemove(file, out _))
-        {
-            FileProcessor fileProcessor = new(file);
-            fileProcessor.Process();
-        }
+        var fileProcessor = new FileProcessor(args.CacheItem.Key);
+        fileProcessor.Process();
+    }
+    else
+    {
+        WriteLine($"WARNING {args.CacheItem.Key} was removed unexpectedly");
+    }
+}
+
+void ProcessExistingFiles(string inputDirectory)
+{
+    WriteLine($"Checking {inputDirectory} for existing files\n");
+    
+    foreach(var filePath in Directory.EnumerateFiles(inputDirectory))
+    {
+        WriteLine($"  - Found {filePath}");
+        AddToCache(filePath);
     }
 }
 
